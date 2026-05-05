@@ -13,10 +13,11 @@
     "--ulimit", "memlock=-1"
   ],
 
-  // Bind-mount repo + data paths from the server
+  // Bind-mount repo + data paths from the server (files stay in place, never copied)
   "mounts": [
     "source=${localWorkspaceFolder},target=/workspace,type=bind",
-    "source=/home/rbc58/mnt,target=/home/rbc58/mnt,type=bind"
+    "source=/home/rbc58/mnt,target=/home/rbc58/mnt,type=bind",
+    "source=/mnt/raid0/rbc58,target=/mnt/raid0/rbc58,type=bind"
   ],
 
   "workspaceFolder": "/workspace",
