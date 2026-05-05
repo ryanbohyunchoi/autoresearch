@@ -5,23 +5,33 @@
     "dockerfile": "Dockerfile"
   },
 
-  // No GPU needed for local dev — embeddings are precomputed, classifiers are sklearn
-  // For GPU experiments (fine-tuning), run on the cluster via Singularity.def
+  // GPU access — change device=0 to device=1 (etc.) to select a different GPU
+  // Run `nvidia-smi` on the server to find your GPU index
   "runArgs": [
-    "--shm-size=4g"
+    "--gpus", "device=0",
+    "--shm-size=16g",
+    "--ulimit", "memlock=-1"
   ],
 
-  // Bind-mount the repo into /workspace inside the container
+  // Bind-mount repo + data paths from the server
   "mounts": [
-    "source=${localWorkspaceFolder},target=/workspace,type=bind"
+    "source=${localWorkspaceFolder},target=/workspace,type=bind",
+    "source=/home/rbc58/mnt,target=/home/rbc58/mnt,type=bind"
   ],
 
   "workspaceFolder": "/workspace",
   "remoteUser": "dev",
   "updateRemoteUserUID": true,
 
-  // Generate synthetic embeddings on first launch if data/ is empty
+  // Set data env vars and generate synthetic data if not present
   "postCreateCommand": "pip install -r requirements.txt && python prepare.py",
+
+  "remoteEnv": {
+    "CARI_EMB_PATH": "/home/rbc58/mnt/mm_vhd/variant/cari_ecg_embeddings_pretrained_1m.npy",
+    "CARI_CSV": "/home/rbc58/mnt/mm_vhd/variant/variant_cari_cohort.csv",
+    "SCANMP_EMB_PATH": "/home/rbc58/mnt/mm_vhd/variant/scanmp_ecg_embeddings_pretrained_1m.npy",
+    "SCANMP_CSV": "/home/rbc58/mnt/mm_vhd/variant/variant_scan_mp.csv"
+  },
 
   "customizations": {
     "vscode": {
@@ -32,7 +42,7 @@
         "ms-python.black-formatter"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python"
+        "python.defaultInterpreterPath": "/opt/conda/bin/python"
       }
     }
   }

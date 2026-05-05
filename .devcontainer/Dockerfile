@@ -1,5 +1,5 @@
-# Python 3.11 slim base — no GPU needed for embedding-based classification locally
-FROM python:3.11-slim
+# PyTorch base image — includes Python 3.11, CUDA 12.4, cuDNN 9, conda
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
 # System basics
 RUN apt-get update && apt-get install -y \
@@ -28,6 +28,6 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 WORKDIR /workspace
 
-# Install Python dependencies
+# Install Python dependencies (torch is already in the base image — do not add it here)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

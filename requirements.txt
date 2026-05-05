@@ -6,6 +6,7 @@ matplotlib>=3.7.0
 xgboost>=2.0.0
 ipykernel       # Required for VS Code Notebooks
 
-# --- DO NOT ADD TORCH HERE for local dev ---
-# For cluster (Singularity), PyTorch is in the base image.
-# For local dev (Docker), we use sklearn only — no GPU needed.
+# --- DO NOT ADD TORCH HERE ---
+# PyTorch is pre-installed in the base Docker image:
+#   pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+# Adding torch here would overwrite the GPU-optimized version.
