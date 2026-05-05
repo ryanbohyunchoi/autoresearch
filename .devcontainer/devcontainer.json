@@ -5,10 +5,10 @@
     "dockerfile": "Dockerfile"
   },
 
-  // GPU access — change device=0 to device=1 (etc.) to select a different GPU
-  // Run `nvidia-smi` on the server to find your GPU index
+  // GPU access — GPUs 2-7 are free on this server (0 and 1 are occupied)
+  // Change device=2 to any free GPU index shown by nvidia-smi
   "runArgs": [
-    "--gpus", "device=0",
+    "--gpus", "device=2",
     "--shm-size=16g",
     "--ulimit", "memlock=-1"
   ],
