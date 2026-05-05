@@ -1,0 +1,39 @@
+{
+  "name": "autoresearch",
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile"
+  },
+
+  // No GPU needed for local dev — embeddings are precomputed, classifiers are sklearn
+  // For GPU experiments (fine-tuning), run on the cluster via Singularity.def
+  "runArgs": [
+    "--shm-size=4g"
+  ],
+
+  // Bind-mount the repo into /workspace inside the container
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind"
+  ],
+
+  "workspaceFolder": "/workspace",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+
+  // Generate synthetic embeddings on first launch if data/ is empty
+  "postCreateCommand": "pip install -r requirements.txt && python prepare.py",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}

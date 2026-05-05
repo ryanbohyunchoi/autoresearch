@@ -1,97 +1,81 @@
-# autoresearch
+# autoresearch — ATTR-CM
 
-Autonomous ML experiment loop for HPC/SLURM clusters. An LLM agent proposes modifications to a training script, submits SLURM jobs, reads results, and iterates toward a target metric.
+Autonomous AI research for ATTR cardiomyopathy (hATTR vs wtATTR) classification
+from ECG embeddings. Applies Karpathy's autoresearch framework: an AI agent
+iterates on `train.py`, evaluates via 5-fold CV AUROC, and keeps or discards
+each change using git.
 
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch).
+Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch)
+and [ai-ai-ecg](https://github.com/LovedeepDhingra/ai-ai-ecg).
 
 ## Structure
 
 ```
 autoresearch/
-├── Singularity.def          # Container definition (Apptainer/Singularity)
-├── agent/
-│   ├── loop.py              # Main agent loop
-│   ├── llm.py               # Claude API (propose + describe changes)
-│   ├── runner.py            # SLURM job submission + polling
-│   └── evaluator.py         # Read results.json, reconstruct history
-├── targets/
-│   └── example/
-│       ├── train.py         # Baseline training script (agent modifies this)
-│       └── program.md       # Instructions to the agent
-├── slurm/
-│   ├── agent.sh             # SLURM script to run the agent loop itself
-│   └── train_job.sh         # Template SLURM script for each experiment
-└── results/                 # gitignored — experiment outputs live here
-```
-
-## Setup
-
-### 1. Build the container
-
-On a machine with Apptainer (or use the free Sylabs remote builder):
-
-```bash
-apptainer build autoresearch.sif Singularity.def
-# or without root:
-apptainer build --remote autoresearch.sif Singularity.def
-```
-
-Transfer to your cluster:
-```bash
-scp autoresearch.sif user@cluster:/path/to/autoresearch/
-```
-
-### 2. Configure SLURM templates
-
-Edit `slurm/train_job.sh`:
-- Set `EMB_PATH` and `LABELS_PATH` to your data paths
-- Set the path to `autoresearch.sif`
-- Adjust `--partition`, `--mem`, `--time` for your cluster
-
-Edit `slurm/agent.sh`:
-- Set `--partition` for a CPU node (agent loop is lightweight)
-
-### 3. Store your API key
-
-```bash
-echo "sk-ant-..." > ~/.anthropic_key
-chmod 600 ~/.anthropic_key
-```
-
-### 4. Run
-
-```bash
-sbatch slurm/agent.sh
-```
-
-Or locally (if you have `sbatch` access from your login node):
-
-```bash
-export ANTHROPIC_API_KEY=$(cat ~/.anthropic_key)
-python -m agent.loop \
-    --target targets/example \
-    --results results/run_001 \
-    --slurm slurm/train_job.sh \
-    --metric auroc \
-    --n-experiments 20
+├── .devcontainer/
+│   ├── Dockerfile           # Python 3.11 slim — no GPU for local dev
+│   └── devcontainer.json    # VS Code Dev Container config
+├── Singularity.def          # Container for SLURM cluster
+├── prepare.py               # Fixed infrastructure: data loading, evaluate_auroc (IMMUTABLE)
+├── train.py                 # The ONE file the agent modifies
+├── program.md               # Agent experiment loop instructions
+├── CLAUDE.md                # Project context for AI assistants
+└── requirements.txt
 ```
 
 ## How it works
 
-1. Agent reads `program.md` (instructions) + current `train.py`
-2. Sends to Claude with experiment history → gets modified `train.py`
-3. Saves modified script to `results/exp_NNN/train.py`
-4. Submits `train_job.sh` via `sbatch` with `EXP_DIR` set
-5. Polls `squeue` until job finishes
-6. Reads `results/exp_NNN/results.json` for the metric
-7. If improved: uses new script as base for next iteration
-8. Repeats for `--n-experiments` iterations
+1. Agent reads `CLAUDE.md` + `prepare.py` + `train.py` for context
+2. Modifies `train.py` (classifier, preprocessing, hyperparameters)
+3. `git commit -m "description"`
+4. `python train.py > run.log 2>&1`
+5. `grep "^val_auroc" run.log` — extracts the metric
+6. If improved → keep the commit + `git push`
+7. If worse → `git reset --hard HEAD~1`
+8. Repeat forever
 
-## Adding a new target
+## Local setup (Mac — for development without cluster data)
 
-1. Copy `targets/example/` to `targets/my_experiment/`
-2. Edit `train.py` to be your baseline training script
-   - Must read `EXP_DIR`, `EMB_PATH`, `LABELS_PATH` from env
-   - Must write `{"auroc": <float>}` (or your metric key) to `$EXP_DIR/results.json`
-3. Edit `program.md` to describe what the agent should/shouldn't touch
-4. Point `--target targets/my_experiment` when running the loop
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- VS Code + [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+### Steps
+1. Open this repo in VS Code
+2. `Ctrl+Shift+P` → **Dev Containers: Reopen in Container**
+3. Wait for build (~2 min first time)
+4. `python prepare.py` — generates synthetic embeddings if no real data
+
+### Running an experiment locally
+```bash
+python train.py > run.log 2>&1
+grep "^val_auroc" run.log
+```
+
+## Cluster setup (SLURM + Apptainer)
+
+```bash
+# Build container (on a machine with build rights, or use --remote)
+apptainer build autoresearch.sif Singularity.def
+
+# Transfer to cluster
+scp autoresearch.sif user@cluster:/path/to/autoresearch/
+
+# Set data paths and run
+export CARI_EMB_PATH=/home/rbc58/mnt/mm_vhd/variant/cari_ecg_embeddings_pretrained_1m.npy
+export CARI_CSV=/home/rbc58/mnt/mm_vhd/variant/variant_cari_cohort.csv
+export SCANMP_EMB_PATH=/home/rbc58/mnt/mm_vhd/variant/scanmp_ecg_embeddings_pretrained_1m.npy
+export SCANMP_CSV=/home/rbc58/mnt/mm_vhd/variant/variant_scan_mp.csv
+
+apptainer exec autoresearch.sif python train.py > run.log 2>&1
+```
+
+## Starting an agent run
+
+Open this repo in Claude Code and type:
+```
+/autoresearch
+```
+
+Or just describe what you want: *"Start an autoresearch experiment run to optimize
+hATTR vs wtATTR classification AUROC"* — Claude will read `program.md` and begin.

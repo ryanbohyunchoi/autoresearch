@@ -1,6 +1,11 @@
-anthropic>=0.40.0
-numpy>=1.24
-pandas>=2.0
-scikit-learn>=1.3
-pyyaml>=6.0
-tqdm>=4.0
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+matplotlib>=3.7.0
+xgboost>=2.0.0
+ipykernel       # Required for VS Code Notebooks
+
+# --- DO NOT ADD TORCH HERE for local dev ---
+# For cluster (Singularity), PyTorch is in the base image.
+# For local dev (Docker), we use sklearn only — no GPU needed.

@@ -1,14 +1,26 @@
-results/
-*.sif
+# Python
+__pycache__/
+*.py[oc]
+*.egg-info/
+.venv/
+venv/
+
+# Data (never commit embeddings or CSVs with patient data)
+data/
 *.npy
+*.csv
+
+# Experiment artifacts
+run.log
+*.log
+results.tsv
+checkpoints/
 *.pkl
 *.pt
-*.onnx
-data_folder/
-__pycache__/
-*.pyc
-.env
-~/.anthropic_key
-logs/
-*.egg-info/
+*.pth
+
+# IDE / OS
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
