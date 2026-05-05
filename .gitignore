@@ -1,0 +1,14 @@
+results/
+*.sif
+*.npy
+*.pkl
+*.pt
+*.onnx
+data_folder/
+__pycache__/
+*.pyc
+.env
+~/.anthropic_key
+logs/
+*.egg-info/
+.DS_Store

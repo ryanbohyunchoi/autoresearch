@@ -1,0 +1,23 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:24.12-py3
+
+%post
+    pip install --no-cache-dir \
+        anthropic \
+        tiktoken \
+        numpy \
+        pandas \
+        scikit-learn \
+        pyyaml \
+        tqdm
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export PYTHONDONTWRITEBYTECODE=1
+
+%runscript
+    exec python "$@"
+
+%labels
+    Author ryanchoi
+    Description Autoresearch agent container for HPC/SLURM clusters
