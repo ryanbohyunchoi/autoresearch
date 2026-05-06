@@ -35,7 +35,7 @@ from prepare import (
 
 ENCODER          = "pretrained_1m"    # onnx | pretrained_1m | biocontrastive | biocontrastive_pretrained
 USE_DEMOGRAPHICS = False              # WARNING: demographics hurt SCAN MP (0.59 vs 0.645 ECG-only)
-C                = 0.01               # LR regularization (try: 0.01, 0.1, 1.0, 10.0)
+C_VALUES         = [0.001, 0.01, 0.1]  # ensemble of LR models with different regularization
 MAX_ITER         = 1000
 CLASS_WEIGHT     = "balanced"
 
@@ -158,10 +158,13 @@ for fold, (train_idx, val_idx) in enumerate(splits):
         X_tr  = np.hstack([X_tr,  demo_tr])
         X_val = np.hstack([X_val, demo_val])
 
-    clf = LogisticRegression(C=C, max_iter=MAX_ITER, class_weight=CLASS_WEIGHT,
-                             solver="lbfgs", random_state=RANDOM_SEED)
-    clf.fit(X_tr, y_cari[train_idx])
-    probs = clf.predict_proba(X_val)[:, 1]
+    fold_probs = []
+    for c in C_VALUES:
+        clf = LogisticRegression(C=c, max_iter=MAX_ITER, class_weight=CLASS_WEIGHT,
+                                 solver="lbfgs", random_state=RANDOM_SEED)
+        clf.fit(X_tr, y_cari[train_idx])
+        fold_probs.append(clf.predict_proba(X_val)[:, 1])
+    probs = np.mean(fold_probs, axis=0)
     fold_aurocs.append(roc_auc_score(y_cari[val_idx], probs))
     print(f"  fold {fold+1}/{N_FOLDS}: AUROC={fold_aurocs[-1]:.4f}")
 
@@ -189,10 +192,14 @@ try:
         X_cari_full   = X_cari_scaled
         X_scanmp_full = X_scanmp_scaled
 
-    clf_full = LogisticRegression(C=C, max_iter=MAX_ITER, class_weight=CLASS_WEIGHT,
-                                  solver="lbfgs", random_state=RANDOM_SEED)
-    clf_full.fit(X_cari_full, y_cari)
-    probs_scanmp = clf_full.predict_proba(X_scanmp_full)[:, 1]
+    scanmp_probs = []
+    for c in C_VALUES:
+        clf_full = LogisticRegression(C=c, max_iter=MAX_ITER, class_weight=CLASS_WEIGHT,
+                                      solver="lbfgs", random_state=RANDOM_SEED)
+        clf_full.fit(X_cari_full, y_cari)
+        scanmp_probs.append(clf_full.predict_proba(X_scanmp_full)[:, 1])
+    clf_full = None  # ensemble; no single model to save
+    probs_scanmp = np.mean(scanmp_probs, axis=0)
     scanmp_auroc = float(roc_auc_score(y_scanmp, probs_scanmp))
     print(f"SCAN MP: {len(y_scanmp)} patients | AUROC={scanmp_auroc:.4f}")
 
