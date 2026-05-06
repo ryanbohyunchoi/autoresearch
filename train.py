@@ -34,7 +34,7 @@ from prepare import (
 # ---------------------------------------------------------------------------
 
 ENCODER          = "pretrained_1m"    # onnx | pretrained_1m | biocontrastive | biocontrastive_pretrained
-USE_DEMOGRAPHICS = True               # concatenate age + gender + race + ethnicity with embedding
+USE_DEMOGRAPHICS = False              # concatenate age + gender + race + ethnicity with embedding
 C                = 1.0                # LR regularization (try: 0.01, 0.1, 1.0, 10.0)
 MAX_ITER         = 1000
 CLASS_WEIGHT     = "balanced"
