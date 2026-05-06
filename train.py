@@ -164,6 +164,13 @@ for fold, (train_idx, val_idx) in enumerate(splits):
                                  solver="lbfgs", random_state=RANDOM_SEED)
         clf.fit(X_tr, y_cari[train_idx])
         fold_probs.append(clf.predict_proba(X_val)[:, 1])
+    # L1 models for feature selection diversity
+    for c in [0.01, 0.1]:
+        clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
+                                    class_weight=CLASS_WEIGHT, solver="saga",
+                                    random_state=RANDOM_SEED)
+        clf_l1.fit(X_tr, y_cari[train_idx])
+        fold_probs.append(clf_l1.predict_proba(X_val)[:, 1])
     probs = np.mean(fold_probs, axis=0)
     fold_aurocs.append(roc_auc_score(y_cari[val_idx], probs))
     print(f"  fold {fold+1}/{N_FOLDS}: AUROC={fold_aurocs[-1]:.4f}")
@@ -198,6 +205,12 @@ try:
                                       solver="lbfgs", random_state=RANDOM_SEED)
         clf_full.fit(X_cari_full, y_cari)
         scanmp_probs.append(clf_full.predict_proba(X_scanmp_full)[:, 1])
+    for c in [0.01, 0.1]:
+        clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
+                                    class_weight=CLASS_WEIGHT, solver="saga",
+                                    random_state=RANDOM_SEED)
+        clf_l1.fit(X_cari_full, y_cari)
+        scanmp_probs.append(clf_l1.predict_proba(X_scanmp_full)[:, 1])
     clf_full = None  # ensemble; no single model to save
     probs_scanmp = np.mean(scanmp_probs, axis=0)
     scanmp_auroc = float(roc_auc_score(y_scanmp, probs_scanmp))
