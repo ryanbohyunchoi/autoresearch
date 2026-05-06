@@ -41,8 +41,8 @@ IMAGE_SIZE  = (300, 300)   # standard for amyloid/biocontrastive encoders
 BATCH_SIZE  = 32           # for embedding extraction (not training)
 
 DATA_DIR        = "./data"
-CARI_IMG_DIR    = os.path.join(DATA_DIR, "cari_images")
-SCANMP_IMG_DIR  = os.path.join(DATA_DIR, "scanmp_images")
+CARI_IMG_DIR    = os.path.join(DATA_DIR, "cari_renamed")
+SCANMP_IMG_DIR  = os.path.join(DATA_DIR, "scanmp_renamed")
 CARI_CSV        = os.path.join(DATA_DIR, "cari_cohort.csv")
 SCANMP_CSV      = os.path.join(DATA_DIR, "scanmp_cohort.csv")
 ENCODERS_DIR    = os.path.join(DATA_DIR, "encoders")
