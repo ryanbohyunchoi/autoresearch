@@ -5,10 +5,13 @@ __pycache__/
 .venv/
 venv/
 
-# Data (never commit embeddings or CSVs with patient data)
+# Data (never commit images, embeddings, CSVs, or model checkpoints)
 data/
 *.npy
 *.csv
+*.onnx
+*.pt
+*.pth
 
 # Experiment artifacts
 run.log

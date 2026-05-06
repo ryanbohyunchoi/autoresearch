@@ -7,14 +7,20 @@ vs wild-type (wtATTR) transthyretin amyloid cardiomyopathy from ECG embeddings.
 ## Commands
 
 ```bash
-# Verify data / generate synthetic data
-python prepare.py
+# Generate synthetic images + CSVs for local pipeline testing
+python prepare.py --synthetic
+
+# Extract embeddings for a specific encoder (run once per encoder)
+python prepare.py --encoder pretrained_1m
+python prepare.py --encoder onnx
+python prepare.py --encoder biocontrastive
+python prepare.py --encoder biocontrastive_pretrained
 
 # Run one experiment
 python train.py > run.log 2>&1
 
 # Extract metric
-grep "^val_auroc:" run.log
+grep "^val_auroc\|^scanmp_auroc" run.log
 
 # Agent keep/discard loop (see program.md for full protocol)
 git add train.py && git commit -m "experiment: <description>"   # keep improvement
@@ -56,25 +62,30 @@ See `program.md` for the full experiment loop protocol.
 
 ## Data Format
 
-**Embeddings:** `.npy` files containing a Python dict `{patient_id: np.ndarray(1536,)}`.
-Load with `np.load(path, allow_pickle=True).item()`.
+```
+data/
+  cari_images/                  ← deidentified CARI ECG PNGs (cari1.png, cari2.png, ...)
+  scanmp_images/                ← deidentified SCAN MP ECG PNGs (smp1.png, smp2.png, ...)
+  cari_cohort.csv               ← new_name, label ("hATTR"/"wtATTR"), age, gender, race, ethnicity
+  scanmp_cohort.csv             ← new_name, label (1=hATTR/0=wtATTR), Age, Gender, Black_race, Hispanic_ethnicity
+  encoders/
+    converted_model.onnx                  ← amyloid ONNX frozen baseline
+    demo_pretrained_encoder_1m.pt         ← best result so far (0.79 SCAN MP)
+    biocontrastive_encoder.onnx           ← biocontrastive frozen
+    biocontrastive_pretrained_encoder.pt  ← biocontrastive + demo pretraining
+  cari_embeddings_{encoder}.npy     ← cached after: python prepare.py --encoder <name>
+  scanmp_embeddings_{encoder}.npy   ← same
+```
+
+**Image format:** PNG, 300×300 RGB, raw pixel values [0,255]. ONNX model has built-in normalization.
+
+**Encoder pipeline:** `prepare.py` loads images → resizes to 300×300 → runs ONNX/PyTorch encoder → caches 1536-dim embeddings as `.npy` dict `{new_name: np.ndarray(1536,)}`. `train.py` always loads from cache.
 
 **CARI cohort** (training data):
-- CSV: `variant_cari_cohort.csv`
-- Key columns: `fileID` (embedding key), `hATTR vs. wtATTR` ("hATTR" or "wtATTR")
-- Demographics: `age`, `gender_source_value`, `race_source_value`, `ethnicity_source_value`
-- n ≈ 142 patients (exact count depends on embedding coverage)
-- Split: 5-fold stratified CV (never a fixed test split on CARI)
+- n ≈ 142 patients | split: 5-fold stratified CV (never a fixed test split on CARI)
 
 **SCAN MP cohort** (external test — NEVER train on this):
-- CSV: `variant_scan_mp.csv`
-- Key columns: `StudyID` (embedding key), `PYP+GEN+` (1=hATTR), `PYP+GEN-` (1=wtATTR)
-- Demographics: `Age`, `Gender`, `Black_race`, `Hispanic_ethnicity`
 - n = 46 patients (hATTR=19, wtATTR=27) — small, results are noisy
-
-**Embeddings available** (cluster paths — set via env vars):
-- `cari_ecg_embeddings_pretrained_1m.npy` — amyloid encoder + 1M YNNH demographic pretraining
-- `scanmp_ecg_embeddings_pretrained_1m.npy` — same encoder applied to SCAN MP
 
 ## Model Contract
 

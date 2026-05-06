@@ -16,8 +16,9 @@ Work with the user to set up a new experiment run:
    - `CLAUDE.md` — project overview, data format, model contract, known results, gotchas.
    - `prepare.py` — fixed constants, data loading, evaluation. **Do not modify.**
    - `train.py` — the file you modify. Classifier, preprocessing, feature engineering.
-5. **Verify data exists**: Run `python prepare.py`.
-   If data is missing, it generates synthetic embeddings for pipeline testing.
+5. **Verify data and embeddings exist**: Run `python prepare.py --encoder pretrained_1m`.
+   This extracts embeddings from images and caches them. If real images are missing,
+   run `python prepare.py --synthetic` first to generate test data.
 6. **Initialize results.tsv**: Create with just the header row (see format below).
 7. **Push the branch**: `git push -u origin autoresearch/<tag>`
 8. **Confirm and go.**
@@ -130,12 +131,12 @@ if you should continue. The loop runs until the human manually interrupts you.
 
 ## Promising directions to explore
 
+- **Encoder swapping:** Change `ENCODER` constant — try all 4 encoders, find which transfers best
 - **Regularization:** LR C value (0.001, 0.01, 0.1, 1, 10), L1 vs L2 penalty
-- **Dimensionality reduction:** PCA (16, 32, 64, 128 dims), UMAP, feature selection
-- **Classifiers:** MLP (sklearn), SVM (RBF kernel), XGBoost, Random Forest, ensemble
-- **Demographics:** concatenate age + gender + race with ECG embedding
-- **Normalization:** StandardScaler, RobustScaler, L2 normalize embeddings
+- **Dimensionality reduction:** PCA (16, 32, 64, 128 dims) before classifier
+- **Classifiers:** MLP (sklearn), SVM (RBF kernel), XGBoost, Random Forest
+- **Demographics:** toggle `USE_DEMOGRAPHICS`, engineer interaction terms (age×race)
+- **Normalization:** StandardScaler vs RobustScaler vs L2-normalize embeddings
 - **Class weighting:** balanced, manual inverse-frequency, no weighting
-- **Calibration:** Platt scaling, isotonic regression on top of classifier
-- **Feature selection:** SelectKBest, variance threshold, recursive elimination
-- **Ensembling:** average predictions from multiple classifiers or embeddings
+- **Ensembling:** average predictions across multiple encoders
+- **Calibration:** Platt scaling or isotonic regression on top of classifier
