@@ -164,10 +164,10 @@ for fold, (train_idx, val_idx) in enumerate(splits):
                                  solver="lbfgs", random_state=RANDOM_SEED)
         clf.fit(X_tr, y_cari[train_idx])
         fold_probs.append(clf.predict_proba(X_val)[:, 1])
-    # L1 models for feature selection diversity
-    for c in [0.01, 0.1]:
+    # L1 models (liblinear, fast feature selection)
+    for c in [0.001, 0.01, 0.1]:
         clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
-                                    class_weight=CLASS_WEIGHT, solver="saga",
+                                    class_weight=CLASS_WEIGHT, solver="liblinear",
                                     random_state=RANDOM_SEED)
         clf_l1.fit(X_tr, y_cari[train_idx])
         fold_probs.append(clf_l1.predict_proba(X_val)[:, 1])
@@ -205,9 +205,9 @@ try:
                                       solver="lbfgs", random_state=RANDOM_SEED)
         clf_full.fit(X_cari_full, y_cari)
         scanmp_probs.append(clf_full.predict_proba(X_scanmp_full)[:, 1])
-    for c in [0.01, 0.1]:
+    for c in [0.001, 0.01, 0.1]:
         clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
-                                    class_weight=CLASS_WEIGHT, solver="saga",
+                                    class_weight=CLASS_WEIGHT, solver="liblinear",
                                     random_state=RANDOM_SEED)
         clf_l1.fit(X_cari_full, y_cari)
         scanmp_probs.append(clf_l1.predict_proba(X_scanmp_full)[:, 1])
