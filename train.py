@@ -35,7 +35,7 @@ from prepare import (
 
 ENCODER          = "pretrained_1m"    # onnx | pretrained_1m | biocontrastive | biocontrastive_pretrained
 USE_DEMOGRAPHICS = False              # WARNING: demographics hurt SCAN MP (0.59 vs 0.645 ECG-only)
-C                = 1.0                # LR regularization (try: 0.01, 0.1, 1.0, 10.0)
+C                = 0.01               # LR regularization (try: 0.01, 0.1, 1.0, 10.0)
 MAX_ITER         = 1000
 CLASS_WEIGHT     = "balanced"
 
