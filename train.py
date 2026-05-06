@@ -65,31 +65,35 @@ print(f"CARI: {len(y_cari)} patients | hATTR={y_cari.sum()} wtATTR={(y_cari==0).
 # Demographics preprocessing
 # ---------------------------------------------------------------------------
 
-def build_demo_features(demo: pd.DataFrame, fit_scaler=None, fit_ohe_cols=None):
-    """
-    Encode demographics: standardize age, one-hot encode categoricals.
-    Returns (features_array, scaler, ohe_cols).
-    Pass fit_scaler/fit_ohe_cols from training fold to apply same transform to val.
-    """
-    # Detect column names (CARI uses lowercase, SCAN MP uses Title case)
-    age_col     = "age"     if "age"     in demo.columns else "Age"
-    gender_col  = "gender"  if "gender"  in demo.columns else "Gender"
-    race_col    = "race"    if "race"    in demo.columns else "Black_race"
-    eth_col     = "ethnicity" if "ethnicity" in demo.columns else "Hispanic_ethnicity"
-
+# Pre-compute consistent OHE columns from full CARI dataset (fixes fold mismatch)
+def _get_demo_dummies(demo: pd.DataFrame, ohe_columns=None):
+    """One-hot encode categoricals, aligned to a fixed column set."""
+    age_col = "age" if "age" in demo.columns else "Age"
+    cat_cols = [c for c in ["gender", "race", "ethnicity", "Gender", "Black_race", "Hispanic_ethnicity"]
+                if c in demo.columns]
     num = demo[[age_col]].fillna(demo[age_col].median()).values.astype(np.float32)
-    cat_cols = [c for c in [gender_col, race_col, eth_col] if c in demo.columns]
-    cat = pd.get_dummies(demo[cat_cols].fillna("Unknown"), drop_first=False).values.astype(np.float32)
+    dummies = pd.get_dummies(demo[cat_cols].fillna("Unknown"), drop_first=False)
+    if ohe_columns is not None:
+        dummies = dummies.reindex(columns=ohe_columns, fill_value=0)
+    return num, dummies
 
+
+# Fit OHE columns on full CARI to ensure consistency across folds
+_, _full_dummies = _get_demo_dummies(demo_cari)
+OHE_COLUMNS = _full_dummies.columns.tolist()
+
+
+def build_demo_features(demo: pd.DataFrame, fit_scaler=None):
+    """Standardize age + one-hot encode categoricals with fixed columns."""
+    num, dummies = _get_demo_dummies(demo, ohe_columns=OHE_COLUMNS)
+    cat = dummies.values.astype(np.float32)
     if fit_scaler is None:
         scaler = StandardScaler()
         num = scaler.fit_transform(num)
     else:
         scaler = fit_scaler
         num = scaler.transform(num)
-
-    features = np.hstack([num, cat]) if cat.shape[1] > 0 else num
-    return features, scaler, cat_cols
+    return np.hstack([num, cat]), scaler
 
 
 # ---------------------------------------------------------------------------
@@ -109,9 +113,8 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(X_cari, y_cari)):
 
     # Concatenate demographics
     if USE_DEMOGRAPHICS:
-        demo_tr, demo_scaler, ohe_cols = build_demo_features(demo_cari.iloc[train_idx])
-        demo_val, _, _                 = build_demo_features(demo_cari.iloc[val_idx],
-                                                              fit_scaler=demo_scaler)
+        demo_tr, demo_scaler = build_demo_features(demo_cari.iloc[train_idx])
+        demo_val, _          = build_demo_features(demo_cari.iloc[val_idx], fit_scaler=demo_scaler)
         X_tr  = np.hstack([X_tr,  demo_tr])
         X_val = np.hstack([X_val, demo_val])
 
@@ -138,17 +141,16 @@ try:
     X_scanmp_scaled = emb_scaler_full.transform(X_scanmp)
 
     if USE_DEMOGRAPHICS:
-        demo_cari_feat, demo_scaler_full, _ = build_demo_features(demo_cari)
-        demo_scanmp_feat, _, _              = build_demo_features(demo_scanmp,
-                                                                   fit_scaler=demo_scaler_full)
-        # Align columns (SCAN MP may have different demo cols than CARI)
-        n_cari_demo = demo_cari_feat.shape[1]
-        n_smp_demo  = demo_scanmp_feat.shape[1]
-        if n_smp_demo < n_cari_demo:
-            pad = np.zeros((len(demo_scanmp_feat), n_cari_demo - n_smp_demo), dtype=np.float32)
-            demo_scanmp_feat = np.hstack([demo_scanmp_feat, pad])
-        elif n_smp_demo > n_cari_demo:
-            demo_scanmp_feat = demo_scanmp_feat[:, :n_cari_demo]
+        demo_cari_feat, demo_scaler_full = build_demo_features(demo_cari)
+        # SCAN MP has different col names — build its features independently then pad to match
+        _, _smp_dummies = _get_demo_dummies(demo_scanmp)
+        _smp_num, _ = _get_demo_dummies(demo_scanmp)
+        _smp_num = _smp_num[0] if isinstance(_smp_num, tuple) else _smp_num
+        age_col_smp = "Age" if "Age" in demo_scanmp.columns else "age"
+        smp_num = demo_scanmp[[age_col_smp]].fillna(demo_scanmp[age_col_smp].median()).values.astype(np.float32)
+        smp_num = demo_scaler_full.transform(smp_num)
+        smp_cat = _smp_dummies.reindex(columns=OHE_COLUMNS, fill_value=0).values.astype(np.float32)
+        demo_scanmp_feat = np.hstack([smp_num, smp_cat])
 
         X_cari_full   = np.hstack([X_cari_scaled,   demo_cari_feat])
         X_scanmp_full = np.hstack([X_scanmp_scaled, demo_scanmp_feat])
