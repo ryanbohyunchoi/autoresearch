@@ -298,7 +298,10 @@ def load_cari_data(encoder_name: str) -> tuple[np.ndarray, np.ndarray, pd.DataFr
     valid_ids = [ids[i] for i in valid_idx]
     X    = np.stack([emb_dict[fid] for fid in valid_ids]).astype(np.float32)
     y    = df["label_int"].iloc[valid_idx].values
-    demo = df[["age", "gender", "race", "ethnicity"]].iloc[valid_idx].reset_index(drop=True)
+    demo_cols = ["age", "gender", "race", "ethnicity"]
+    if "patient_group" in df.columns:
+        demo_cols.append("patient_group")
+    demo = df[demo_cols].iloc[valid_idx].reset_index(drop=True)
     return X, y, demo
 
 

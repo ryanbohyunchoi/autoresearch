@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, StratifiedGroupKFold
 from sklearn.preprocessing import StandardScaler
 
 from prepare import (
@@ -127,13 +127,23 @@ def build_demo_features(demo: pd.DataFrame, fit_scaler=None):
 
 
 # ---------------------------------------------------------------------------
-# 5-fold CV with per-fold preprocessing (no leakage)
+# 5-fold CV — grouped by patient if patient_group column is available
 # ---------------------------------------------------------------------------
 
-skf = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+if "patient_group" in demo_cari.columns:
+    groups = demo_cari["patient_group"].values
+    cv = StratifiedGroupKFold(n_splits=N_FOLDS)
+    splits = list(cv.split(X_cari, y_cari, groups=groups))
+    n_patients = len(np.unique(groups))
+    print(f"Using StratifiedGroupKFold: {n_patients} unique patients, {len(y_cari)} ECGs")
+else:
+    cv = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+    splits = list(cv.split(X_cari, y_cari))
+    print("WARNING: no patient_group column — CV splits by row (patient leakage possible)")
+
 fold_aurocs = []
 
-for fold, (train_idx, val_idx) in enumerate(skf.split(X_cari, y_cari)):
+for fold, (train_idx, val_idx) in enumerate(splits):
     X_tr, X_val = X_cari[train_idx], X_cari[val_idx]
 
     # Scale embedding
