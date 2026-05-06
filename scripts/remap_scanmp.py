@@ -34,12 +34,21 @@ def main():
 
     df = pd.read_csv(args.metadata)
     print(f"Loaded metadata: {len(df)} rows")
-    print(f"Columns: {list(df.columns)}")
 
-    # Filter to labeled patients only (PYP+GEN+ = hATTR, PYP+GEN- = wtATTR)
+    # Coerce PYP columns to int robustly (handles strings, floats, NaN)
+    for col in ["PYP+GEN+", "PYP+GEN-", "PYP-GEN+", "PYP-GEN-"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+    print(f"\nPYP+GEN+ value counts:\n{df['PYP+GEN+'].value_counts()}")
+    print(f"\nPYP+GEN- value counts:\n{df['PYP+GEN-'].value_counts()}")
+
+    # Filter to labeled patients only (PYP+GEN+ = hATTR=1, PYP+GEN- = wtATTR=0)
     labeled = df[(df["PYP+GEN+"] == 1) | (df["PYP+GEN-"] == 1)].copy()
     labeled["label"] = labeled["PYP+GEN+"].astype(int)
-    print(f"Labeled rows: {len(labeled)} | hATTR={labeled['label'].sum()} wtATTR={(labeled['label']==0).sum()}")
+    print(f"\nLabeled rows: {len(labeled)} | hATTR={labeled['label'].sum()} wtATTR={(labeled['label']==0).sum()}")
+    if labeled["label"].sum() == 0:
+        print("WARNING: No hATTR patients found — check PYP+GEN+ column values above")
 
     os.makedirs(args.out_images, exist_ok=True)
     os.makedirs(os.path.dirname(args.out_deident) or ".", exist_ok=True)
