@@ -98,23 +98,27 @@ data/
 
 Agents can replace the entire classifier pipeline as long as this I/O is preserved.
 
-## Known Results (as of 2026-05-05)
+## Known Results
 
-Best results from prior experiments:
-
+### Original variant pipeline (~142 patients, one ECG per patient)
 | Encoder | CARI CV AUROC | SCAN MP AUROC |
 |---------|--------------|---------------|
-| onnx (frozen baseline) | 0.61 | 0.71 |
-| onnx_pca16 + demographics LR | 0.84 | — |
-| onnx_treebased pca16+demo XGB | 0.91 | 0.73 |
-| pretrained_1m (current baseline) | 0.93 | **0.79** |
+| onnx frozen | 0.61 | 0.71 |
+| pretrained_1m ECG-only LR | 0.93 | 0.79 |
 | biocontrastive_pretrained | 0.92 | 0.69 |
 
-Key insight: **CARI CV ~0.93 is driven by demographics** (age/race strongly predict
-hATTR vs wtATTR), not the ECG signal. The large CARI→SCAN MP gap (0.93→0.79)
-suggests demographic overfitting. SCAN MP has different demographic distribution.
+### Current autoresearch baseline (297 patients, 1308 ECGs, grouped CV)
+| Configuration | CARI CV | SCAN MP |
+|---|---|---|
+| pretrained_1m ECG-only LR | 0.64 | **0.645** ← start here |
+| pretrained_1m + demographics LR | 0.91 | 0.59 ← demographics HURT SCAN MP |
 
-**Clinical utility threshold:** AUROC ≥ 0.80 on SCAN MP. Best so far: 0.79.
+Key insight: **demographics overfit to CARI** with 297 patients. Age/race predict
+hATTR in CARI (0.91 CV) but don't transfer to SCAN MP. ECG-only (0.645) is the
+honest baseline. Agent should explore whether demographics can be used carefully.
+
+**Target:** beat 0.79 SCAN MP (original pipeline best).
+**Clinical utility threshold:** AUROC ≥ 0.80 on SCAN MP.
 
 ## Gotchas
 
