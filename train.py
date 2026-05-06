@@ -35,7 +35,7 @@ from prepare import (
 
 ENCODER          = "pretrained_1m"    # onnx | pretrained_1m | biocontrastive | biocontrastive_pretrained
 USE_DEMOGRAPHICS = True               # WARNING: demographics hurt SCAN MP (0.59 vs 0.645 ECG-only)
-C_VALUES         = [0.001, 0.01, 0.1]  # ensemble of LR models with different regularization
+C_VALUES         = [0.001, 0.01, 0.1, 1.0]  # added C=1.0 to boost val_auroc with demographics
 MAX_ITER         = 1000
 CLASS_WEIGHT     = "balanced"
 
