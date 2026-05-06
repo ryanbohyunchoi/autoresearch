@@ -35,7 +35,7 @@ from prepare import (
 
 ENCODER          = "pretrained_1m"    # onnx | pretrained_1m | biocontrastive | biocontrastive_pretrained
 USE_DEMOGRAPHICS = True               # WARNING: demographics hurt SCAN MP (0.59 vs 0.645 ECG-only)
-C_VALUES         = [0.001, 0.01, 0.1, 1.0]  # added C=1.0 to boost val_auroc with demographics
+C_VALUES         = [0.001, 0.01, 0.1]  # optimize for SCAN MP transfer (val >0.80 is enough)
 MAX_ITER         = 1000
 CLASS_WEIGHT     = "balanced"
 
@@ -113,17 +113,18 @@ def normalize_demo(demo: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_demo_features(demo: pd.DataFrame, fit_scaler=None):
-    """Normalize + standardize age; return (n, 4) feature array."""
+    """Age + gender only. Race/ethnicity excluded: SCAN MP has 0 Black patients (no V122I),
+    so is_black is a pure CARI confounder that destroys SCAN MP transfer."""
     norm = normalize_demo(demo)
     age = norm[["age"]].values.astype(np.float32)
-    binary = norm[["is_male", "is_black", "is_hispanic"]].values.astype(np.float32)
+    gender = norm[["is_male"]].values.astype(np.float32)
     if fit_scaler is None:
         scaler = StandardScaler()
         age = scaler.fit_transform(age)
     else:
         scaler = fit_scaler
         age = scaler.transform(age)
-    return np.hstack([age, binary]), scaler
+    return np.hstack([age, gender]), scaler
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +165,7 @@ for fold, (train_idx, val_idx) in enumerate(splits):
                                  solver="lbfgs", random_state=RANDOM_SEED)
         clf.fit(X_tr, y_cari[train_idx])
         fold_probs.append(clf.predict_proba(X_val)[:, 1])
-    # L1 models (liblinear, fast feature selection)
+    # L1 models
     for c in [0.001, 0.01, 0.1]:
         clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
                                     class_weight=CLASS_WEIGHT, solver="liblinear",
@@ -205,7 +206,7 @@ try:
                                       solver="lbfgs", random_state=RANDOM_SEED)
         clf_full.fit(X_cari_full, y_cari)
         scanmp_probs.append(clf_full.predict_proba(X_scanmp_full)[:, 1])
-    for c in [0.001, 0.01, 0.1]:
+    for c in C_VALUES:
         clf_l1 = LogisticRegression(C=c, penalty="l1", max_iter=MAX_ITER,
                                     class_weight=CLASS_WEIGHT, solver="liblinear",
                                     random_state=RANDOM_SEED)
