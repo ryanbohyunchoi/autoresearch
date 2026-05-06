@@ -63,37 +63,67 @@ print(f"CARI: {len(y_cari)} patients | hATTR={y_cari.sum()} wtATTR={(y_cari==0).
 
 # ---------------------------------------------------------------------------
 # Demographics preprocessing
+# Normalizes CARI and SCAN MP to 4 consistent binary features:
+#   age (scaled), is_male, is_black, is_hispanic
+# This ensures identical feature space across both cohorts.
 # ---------------------------------------------------------------------------
 
-# Pre-compute consistent OHE columns from full CARI dataset (fixes fold mismatch)
-def _get_demo_dummies(demo: pd.DataFrame, ohe_columns=None):
-    """One-hot encode categoricals, aligned to a fixed column set."""
+def normalize_demo(demo: pd.DataFrame) -> pd.DataFrame:
+    """Convert CARI or SCAN MP demographics to a consistent 4-column format."""
+    n = len(demo)
+    out = pd.DataFrame(index=demo.index)
+
+    # Age
     age_col = "age" if "age" in demo.columns else "Age"
-    cat_cols = [c for c in ["gender", "race", "ethnicity", "Gender", "Black_race", "Hispanic_ethnicity"]
-                if c in demo.columns]
-    num = demo[[age_col]].fillna(demo[age_col].median()).values.astype(np.float32)
-    dummies = pd.get_dummies(demo[cat_cols].fillna("Unknown"), drop_first=False)
-    if ohe_columns is not None:
-        dummies = dummies.reindex(columns=ohe_columns, fill_value=0)
-    return num, dummies
+    out["age"] = pd.to_numeric(demo[age_col], errors="coerce").fillna(demo[age_col].median() if age_col in demo.columns else 65)
 
+    # is_male
+    if "gender" in demo.columns:
+        out["is_male"] = (demo["gender"].str.upper().str.strip() == "MALE").astype(float)
+    elif "Gender" in demo.columns:
+        out["is_male"] = (demo["Gender"].str.strip().str.upper() == "MALE").astype(float)
+    else:
+        out["is_male"] = 0.0
 
-# Fit OHE columns on full CARI to ensure consistency across folds
-_, _full_dummies = _get_demo_dummies(demo_cari)
-OHE_COLUMNS = _full_dummies.columns.tolist()
+    # is_black
+    if "race" in demo.columns:
+        out["is_black"] = demo["race"].str.lower().str.contains("black|african", na=False).astype(float)
+    elif "Black_race" in demo.columns:
+        br = demo["Black_race"]
+        if pd.api.types.is_numeric_dtype(br):
+            out["is_black"] = br.fillna(0).astype(float)
+        else:
+            out["is_black"] = br.str.lower().str.contains("black|african", na=False).astype(float)
+    else:
+        out["is_black"] = 0.0
+
+    # is_hispanic
+    if "ethnicity" in demo.columns:
+        out["is_hispanic"] = demo["ethnicity"].str.lower().str.contains("hispanic", na=False).astype(float)
+    elif "Hispanic_ethnicity" in demo.columns:
+        he = demo["Hispanic_ethnicity"]
+        if pd.api.types.is_numeric_dtype(he):
+            out["is_hispanic"] = he.fillna(0).astype(float)
+        else:
+            out["is_hispanic"] = he.str.lower().str.contains("yes|hispanic", na=False).astype(float)
+    else:
+        out["is_hispanic"] = 0.0
+
+    return out
 
 
 def build_demo_features(demo: pd.DataFrame, fit_scaler=None):
-    """Standardize age + one-hot encode categoricals with fixed columns."""
-    num, dummies = _get_demo_dummies(demo, ohe_columns=OHE_COLUMNS)
-    cat = dummies.values.astype(np.float32)
+    """Normalize + standardize age; return (n, 4) feature array."""
+    norm = normalize_demo(demo)
+    age = norm[["age"]].values.astype(np.float32)
+    binary = norm[["is_male", "is_black", "is_hispanic"]].values.astype(np.float32)
     if fit_scaler is None:
         scaler = StandardScaler()
-        num = scaler.fit_transform(num)
+        age = scaler.fit_transform(age)
     else:
         scaler = fit_scaler
-        num = scaler.transform(num)
-    return np.hstack([num, cat]), scaler
+        age = scaler.transform(age)
+    return np.hstack([age, binary]), scaler
 
 
 # ---------------------------------------------------------------------------
@@ -142,16 +172,7 @@ try:
 
     if USE_DEMOGRAPHICS:
         demo_cari_feat, demo_scaler_full = build_demo_features(demo_cari)
-        # SCAN MP has different col names — build its features independently then pad to match
-        _, _smp_dummies = _get_demo_dummies(demo_scanmp)
-        _smp_num, _ = _get_demo_dummies(demo_scanmp)
-        _smp_num = _smp_num[0] if isinstance(_smp_num, tuple) else _smp_num
-        age_col_smp = "Age" if "Age" in demo_scanmp.columns else "age"
-        smp_num = demo_scanmp[[age_col_smp]].fillna(demo_scanmp[age_col_smp].median()).values.astype(np.float32)
-        smp_num = demo_scaler_full.transform(smp_num)
-        smp_cat = _smp_dummies.reindex(columns=OHE_COLUMNS, fill_value=0).values.astype(np.float32)
-        demo_scanmp_feat = np.hstack([smp_num, smp_cat])
-
+        demo_scanmp_feat, _              = build_demo_features(demo_scanmp, fit_scaler=demo_scaler_full)
         X_cari_full   = np.hstack([X_cari_scaled,   demo_cari_feat])
         X_scanmp_full = np.hstack([X_scanmp_scaled, demo_scanmp_feat])
     else:
